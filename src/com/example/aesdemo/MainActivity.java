@@ -1,11 +1,15 @@
 package com.example.aesdemo;
 
+import java.io.BufferedInputStream;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
+import java.security.SignatureException;
 import java.security.spec.InvalidKeySpecException;
 import java.util.ArrayList;
 import java.util.List;
@@ -354,5 +358,107 @@ public class MainActivity extends Activity {
       }    
       return res;
     }
+        
+    /**
+     * Generates DSA keypair. Must be placed before new 
+     * signing the file. If this method is missing, 
+     * the last keypair in history will be used.
+     * 
+     * @return the public key encoded in base64 text
+     */
+    public String PrepareDsaKeyPair(){
+      String pubKeyString = "";
+      try {
+        byte[][] kp = CryptoUtil.generateDsaKeyPair();
+        pubKeyString = Base64.encodeToString(kp[0], Base64.URL_SAFE | Base64.NO_WRAP | Base64.NO_PADDING);
+        SharedPreferences sharedPreferences = this.getSharedPreferences("TinyDB1", Context.MODE_PRIVATE);
+        SharedPreferences.Editor sharedPrefsEditor = sharedPreferences.edit();
+        sharedPrefsEditor.putString("_DSA_PRI_KEY", Base64.encodeToString(kp[1], Base64.URL_SAFE | Base64.NO_WRAP | Base64.NO_PADDING));
+        sharedPrefsEditor.commit();
+      } catch (NoSuchAlgorithmException e) {
+        Log.d(TAG, "PrepareRsaKeyPair:" + "NoSuchAlgorithmException. " + e.getMessage());
+      } catch (InvalidKeySpecException e) {
+        Log.d(TAG, "PrepareRsaKeyPair:" + "InvalidKeySpecException. " + e.getMessage());
+      } catch (IOException e) {
+        Log.d(TAG, "PrepareRsaKeyPair:" + "IOException. " + e.getMessage());
+      }
+      return pubKeyString;
+    }
     
+    /**
+     * Signs file with DSA private key.
+     * Returns signature encoded in base64 string.
+     * 
+     * @param path file path
+     * @return signature encoded in base64 string
+     */
+    public String DsaFileSign(String path){
+      String res = "";      
+      byte[] data = null;
+      try {
+        FileInputStream fis = new FileInputStream(path);
+        BufferedInputStream bufin = new BufferedInputStream(fis);
+        data = new byte[bufin.available()];
+        bufin.read(data);
+        bufin.close();
+      } catch (FileNotFoundException e) {
+        Log.d(TAG, "DsaFileSign:" + "FileNotFoundException. " + e.getMessage());
+      } catch (IOException e) {
+        Log.d(TAG, "DsaFileSign:" + "IOException. " + e.getMessage());
+      }
+      SharedPreferences sharedPreferences = this.getSharedPreferences("TinyDB1", Context.MODE_PRIVATE);
+      byte[] priKey = Base64.decode(sharedPreferences.getString("_RSA_PRI_KEY", ""), Base64.URL_SAFE | Base64.NO_WRAP | Base64.NO_PADDING);
+      try {
+        byte[] signature = CryptoUtil.dsaSign(priKey, data);
+        res = Base64.encodeToString(signature, Base64.URL_SAFE | Base64.NO_WRAP | Base64.NO_PADDING);
+      } catch (InvalidKeyException e) {
+        Log.d(TAG, "DsaFileSign:" + "InvalidKeyException. " + e.getMessage());
+      } catch (NoSuchAlgorithmException e) {
+        Log.d(TAG, "DsaFileSign:" + "NoSuchAlgorithmException. " + e.getMessage());
+      } catch (InvalidKeySpecException e) {
+        Log.d(TAG, "DsaFileSign:" + "InvalidKeySpecException. " + e.getMessage());
+      } catch (SignatureException e) {
+        Log.d(TAG, "DsaFileSign:" + "SignatureException. " + e.getMessage());
+      }
+      return res;
+    }
+    
+    /**
+     * Verifies the signature with given file.
+     * Returns true if the signature is authentic, otherwise false.
+     * 
+     * @param key the DSA public key in base64 string
+     * @param signature the signature in base64 to be verified
+     * @param path file path
+     * @return true if the signature is authentic, otherwise false.
+     */
+    public boolean DsaFileVerify(String key, String signature, String path){
+      boolean res = false;
+      byte[] data = null;
+      try {
+        FileInputStream fis = new FileInputStream(path);
+        BufferedInputStream bufin = new BufferedInputStream(fis);
+        data = new byte[bufin.available()];
+        bufin.read(data);
+        bufin.close();
+      } catch (FileNotFoundException e) {
+        Log.d(TAG, "DsaFileVerify:" + "FileNotFoundException. " + e.getMessage());
+      } catch (IOException e) {
+        Log.d(TAG, "DsaFileVerify:" + "IOException. " + e.getMessage());
+      }
+      byte[] pubKey = Base64.decode(key, Base64.URL_SAFE | Base64.NO_WRAP | Base64.NO_PADDING);
+      byte[] sigToVerify = Base64.decode(signature, Base64.URL_SAFE | Base64.NO_WRAP | Base64.NO_PADDING);
+      try {
+        res = CryptoUtil.dsaVerify(pubKey, sigToVerify, data);
+      } catch (InvalidKeyException e) {
+        Log.d(TAG, "DsaFileVerify:" + "InvalidKeyException. " + e.getMessage());
+      } catch (NoSuchAlgorithmException e) {
+        Log.d(TAG, "DsaFileVerify:" + "NoSuchAlgorithmException. " + e.getMessage());
+      } catch (InvalidKeySpecException e) {
+        Log.d(TAG, "DsaFileVerify:" + "InvalidKeySpecException. " + e.getMessage());
+      } catch (SignatureException e) {
+        Log.d(TAG, "DsaFileVerify:" + "SignatureException. " + e.getMessage());
+      }
+      return res;
+    }
 }

@@ -14,6 +14,8 @@ import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.security.Security;
+import java.security.Signature;
+import java.security.SignatureException;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
@@ -362,6 +364,83 @@ public class CryptoUtil {
     cipher.init(Cipher.DECRYPT_MODE, priKey);
     byte[] decryptedData = cipher.doFinal(data);
     return decryptedData;
+  }
+  
+  /**
+   * Generates DSA key pair
+   * Note: PublicKey is in X.509 format,
+   * PrivateKey is in PKCS#8 format
+   * 
+   * @return 2-element array of public key and private key in byte array
+   * @throws NoSuchAlgorithmException
+   * @throws InvalidKeySpecException
+   * @throws IOException
+   */
+  public static byte[][] generateDsaKeyPair() throws 
+  NoSuchAlgorithmException, InvalidKeySpecException, IOException{
+    KeyPairGenerator kpg = KeyPairGenerator.getInstance("DSA");
+    SecureRandom random = SecureRandom.getInstance("SHA1PRNG");
+    kpg.initialize(1024, random);
+    KeyPair kp = kpg.genKeyPair();
+    
+    PublicKey pubKey = kp.getPublic();
+    PrivateKey priKey = kp.getPrivate();
+    
+    byte[][] res = {pubKey.getEncoded(), priKey.getEncoded()};
+    return res;
+  }
+  
+  /**
+   * Signs data with DSA private key.
+   * Returns the signature in byte array
+   * 
+   * @param priKeyBytes private key in byte array
+   * @param data the file in byte array
+   * @return signature in byte array
+   * @throws NoSuchAlgorithmException
+   * @throws InvalidKeySpecException
+   * @throws InvalidKeyException
+   * @throws SignatureException
+   */
+  public static byte[] dsaSign(byte[] priKeyBytes, byte[] data) throws 
+  NoSuchAlgorithmException, InvalidKeySpecException, 
+  InvalidKeyException, SignatureException {
+    PKCS8EncodedKeySpec priKeySpec = new PKCS8EncodedKeySpec(priKeyBytes);
+    KeyFactory fact = KeyFactory.getInstance("DSA");
+    PrivateKey priKey = fact.generatePrivate(priKeySpec);
+    
+    Signature dsa = Signature.getInstance("SHA1withDSA");
+    dsa.initSign(priKey);
+    dsa.update(data);
+    byte[] signature = dsa.sign();
+    return signature;
+  }
+  
+  /**
+   * Verifies the DSA signature with DSA public key.
+   * Returns true if the signature is authentic, 
+   * otherwise returns false.
+   * 
+   * @param pubKeyBytes DSA public key in byte array
+   * @param sigToVerify the signature to be verified in byte array
+   * @param data the file in byte array
+   * @return true if the signature is authentic, otherwise false
+   * @throws NoSuchAlgorithmException
+   * @throws InvalidKeySpecException
+   * @throws InvalidKeyException
+   * @throws SignatureException
+   */
+  public static boolean dsaVerify(byte[] pubKeyBytes, byte[] sigToVerify, byte[] data) throws 
+  NoSuchAlgorithmException, InvalidKeySpecException, InvalidKeyException, SignatureException{
+    X509EncodedKeySpec pubKeySpec = new X509EncodedKeySpec(pubKeyBytes);
+    KeyFactory fact = KeyFactory.getInstance("DSA");
+    PublicKey pubKey = fact.generatePublic(pubKeySpec);
+    
+    Signature sig = Signature.getInstance("SHA1withDSA");
+    sig.initVerify(pubKey);
+    sig.update(data);
+    boolean verifies = sig.verify(sigToVerify);
+    return verifies;
   }
 
 }
